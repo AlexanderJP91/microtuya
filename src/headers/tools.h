@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 
+#define DEBUG
+
 typedef enum result {   OK               = 0,
 						INPUT_FAIL       = 1,
 						CONNECTION_ERROR = 2

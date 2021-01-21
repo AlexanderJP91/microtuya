@@ -1,8 +1,7 @@
 #include "payload_gen.h"
 #include "aes.h"
 #include "crc32.h"
-
-#define DEBUG
+#include "tools.h"
 
 #define TIMESTAMP_SIZE 10
 
@@ -186,18 +185,18 @@ uint16_t GeneratePayload(device_t *device, command_t command, uint32_t time, uin
 	/////////////////////////////////////
 
 #ifdef DEBUG
-    printf("payload with no padding size: %d\n", payloadSize);
-    printf("ASCII payload with no padding:\n");
-    printf("%s\n", payload);
-    printf("HEX payload with no padding:\n");
-    for (i = 0; i < payloadSize; i++) {
-        if (i > 0)
-            printf(":");
-        printf("%02X", payload[i]);
-    }
-    printf("\n");
-    printf("payloadSize: %d\n", payloadSize);
-    printf("\n\n");
+	printf("payload with no padding size: %d\n", payloadSize);
+	printf("ASCII payload with no padding:\n");
+	printf("%s\n", payload);
+	printf("HEX payload with no padding:\n");
+	for (i = 0; i < payloadSize; i++) {
+		if (i > 0)
+			printf(":");
+		printf("%02X", payload[i]);
+	}
+	printf("\n");
+	printf("payloadSize: %d\n", payloadSize);
+	printf("\n\n");
 #endif
 
 	//////////////////////////
