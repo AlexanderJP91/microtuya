@@ -13,8 +13,9 @@
 typedef enum command {  SWITCH_ON      = 0,
 						SWITCH_OFF     = 1,
 						SET_BRIGHTNESS = 2,
-						SET_WHITE      = 3,
-						SET_COLOR      = 4
+						SET_COLOR_TEMP = 3,
+						SET_WHITE      = 4,
+						SET_COLOR      = 5
 			} command_t;
 
 typedef struct deviceStatus {
