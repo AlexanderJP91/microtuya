@@ -40,19 +40,22 @@ int main(int argc, char *argv[]) {
 	command = argv[6][0] - '0';
 
 	switch(command) {
-		case 0:
+		case SWITCH_ON:
 			inputError = argc == 7 ? 0 : 1;
 			break;
-		case 1:
+		case SWITCH_OFF:
 			inputError = argc == 7 ? 0 : 1;
 			break;
-		case 2:
+		case SET_BRIGHTNESS:
 			inputError = argc == 8 ? 0 : 1;
 			break;
-		case 3:
+		case SET_COLOR_TEMP:
+			inputError = argc == 8 ? 0 : 1;
+			break;
+		case SET_WHITE:
 			inputError = argc == 9 ? 0 : 1;
 			break;
-		case 4:
+		case SET_COLOR:
 			inputError = argc == 10 ? 0 : 1;
 			break;
 		default:
@@ -85,23 +88,27 @@ int main(int argc, char *argv[]) {
 	memset(&(device.status), 0, sizeof(deviceStatus_t));
 
 	switch(command) {
-		case 0:
+		case SWITCH_ON:
 			device.status.brightness = 0;
 			device.status.colorTemp  = 0;
 			break;
-		case 1:
+		case SWITCH_OFF:
 			device.status.brightness = 0;
 			device.status.colorTemp  = 0;
 			break;
-		case 2:
+		case SET_BRIGHTNESS:
 			device.status.brightness = convertStringToUint8(argv[7]);
 			device.status.colorTemp  = 0;
 			break;
-		case 3:
+		case SET_COLOR_TEMP:
+			device.status.brightness = 0;
+			device.status.colorTemp  = convertStringToUint8(argv[7]);
+			break;
+		case SET_WHITE:
 			device.status.brightness = convertStringToUint8(argv[7]);
 			device.status.colorTemp  = convertStringToUint8(argv[8]);
 			break;
-		case 4:
+		case SET_COLOR:
 			device.status.r          = convertStringToUint8(argv[7]);
 			device.status.g          = convertStringToUint8(argv[8]);
 			device.status.b          = convertStringToUint8(argv[9]);

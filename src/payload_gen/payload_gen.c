@@ -13,6 +13,7 @@ static void convertUint8ToHexString(uint8_t inValue, uint8_t *result);
 uint8_t commands[][128] = {	"\"dps\":{\"1\":true}",
 							"\"dps\":{\"1\":false}",
 							"\"dps\":{\"3\":255}",
+							"\"dps\":{\"4\":255}",
 							"\"dps\":{\"2\":\"white\",\"3\":255,\"4\":255}",
 							"\"dps\":{\"2\":\"colour\",\"5\":\"00000000000000\"}"
 						};
@@ -84,8 +85,12 @@ uint16_t generatePayload(device_t *device, command_t command, uint32_t time, uin
 
 	printf("DEBUG 1: %s\n", tmpCommand);
 
-	if(command == SET_BRIGHTNESS) {
-		convertUint8ToString(device->status.brightness, tmpString);
+	if(command == SET_BRIGHTNESS || command == SET_COLOR_TEMP) {
+		if(command == SET_BRIGHTNESS) {
+			convertUint8ToString(device->status.brightness, tmpString);
+		} else {
+			convertUint8ToString(device->status.colorTemp, tmpString);
+		}
 		memcpy(&(tmpCommand[strlen((char*)tmpCommand) - 4]), tmpString, strlen((char*)tmpString));
 		tmpCommand[strlen((char*)tmpCommand) - 4 + strlen((char*)tmpString)] = '}';
 		tmpCommand[strlen((char*)tmpCommand) - 4 + strlen((char*)tmpString) + 1] = '\0';
