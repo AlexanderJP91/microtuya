@@ -5,9 +5,14 @@
 
 #define DEBUG
 
-typedef enum result {   OK               = 0,
-						INPUT_FAIL       = 1,
-						CONNECTION_ERROR = 2
+typedef enum result {   OK                  = 0,
+						INPUT_FAIL          = 1,
+						CONNECTION_ERROR    = 2,
+						TX_ERROR            = 3,
+						MAX_RX_ERROR        = 4,
+                        RESPONSE_SIZE_ERROR = 5,
+                        RESPONSE_DATA_ERROR = 6,
+                        CRC_ERROR           = 7
 			} result_t;
 
 typedef struct rgb {

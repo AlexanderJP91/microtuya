@@ -11,16 +11,12 @@
 
 #define RESP_MAX_SIZE 1024
 
-#define IS_BIG_ENDIAN ('\x01\x02\x03\x04' == 0x01020304)
-
 #define SA struct sockaddr
 
-result_t SendPacket(uint8_t *payload, uint16_t size, device_t *device) {
+result_t SendPacket(uint8_t *payload, uint16_t size, device_t *device, uint8_t *response, uint16_t *responseSize) {
 	int sockfd, connfd;
-	uint16_t responseSize = 0;
+	uint16_t sentBytes = 0, receivedBytes = 0, rxRetries = 0;
 	struct sockaddr_in servaddr, cli;
-
-	uint8_t response[RESP_MAX_SIZE];
 
 	// socket create and varification 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
@@ -30,6 +26,8 @@ result_t SendPacket(uint8_t *payload, uint16_t size, device_t *device) {
 		printf("socket creation failed...\n");
 #endif
 
+		*responseSize = 0xffff;
+		response[0] = '\0';
 		return CONNECTION_ERROR;
 	} 
 	else
@@ -54,26 +52,58 @@ result_t SendPacket(uint8_t *payload, uint16_t size, device_t *device) {
 		printf("CONNECTION FAIL\n");
 #endif
 
+		*responseSize = 0xffff;
+		response[0] = '\0';
 		return CONNECTION_ERROR;
 	}
 
-	uint16_t sentBytes = write(sockfd, payload, size);
+	sentBytes = write(sockfd, payload, size);
+
+	if (sentBytes != size) {
+
+#ifdef DEBUG
+		printf("Mismatch between quantity sent bytes and payload size\n");
+		printf("Sent: %d bytes\n", sentBytes);
+		printf("Payload size: %d bytes\n", size);
+#endif
+
+		//close the socket
+		close(sockfd);
+		*responseSize = 0xffff;
+		response[0] = '\0';
+		return TX_ERROR;
+	}
 
 #ifdef DEBUG
 	printf("PACKET sent, with size: %d bytes\n", size);
 	printf("total number of data sent: %d bytes\n", sentBytes);
 #endif
 
-//TODO: manage this with a loop to append received data
-	if (responseSize <= 28) {
-		responseSize = read(sockfd, response, RESP_MAX_SIZE - 1);
+	while (receivedBytes < RX_MIN_SIZE && rxRetries < MAX_RX_RETRIES) {
+		receivedBytes += read(	sockfd,
+								&(response[receivedBytes]),
+								RESP_MAX_SIZE - 1);
 		usleep(100000);
+		rxRetries++;
+	}
+
+	if (rxRetries == MAX_RX_RETRIES) {
+
+#ifdef DEBUG
+		printf("Maximum number of RX retries reached\n");
+#endif
+
+		//close the socket
+		close(sockfd);
+		*responseSize = 0xffff;
+		response[0] = '\0';
+		return MAX_RX_ERROR;
 	}
 
 #ifdef DEBUG
-	printf("Response received, size: %d bytes\n", responseSize);
+	printf("Response received, size: %d bytes\n", receivedBytes);
 	printf("HEX response:\n");
-	for (uint16_t i = 0; i < responseSize; i++) {
+	for (uint16_t i = 0; i < receivedBytes; i++) {
 		if (i > 0)
 			printf(":");
 		printf("%02X", response[i]);
@@ -81,30 +111,7 @@ result_t SendPacket(uint8_t *payload, uint16_t size, device_t *device) {
 	printf("\n");
 #endif
 
-	uint32_t crc = crc32(response, responseSize - 8);
-	uint8_t crcCheck = 0;
-
-	for (uint8_t i = 0; i < sizeof(crc); i++) {
-#if IS_BIG_ENDIAN == 1
-		uint8_t endianessShift = 8 * ((uint8_t)sizeof(crc) - i - 1);
-#else
-		uint8_t endianessShift = 8 * i;
-#endif
-		crcCheck += response[responseSize - 8 + i] != (uint8_t)(crc >> endianessShift);
-	}
-
-#ifdef DEBUG
-	printf("received CRC: 0x%02x%02x%02x%02x\n", 	response[responseSize - 8], 
-													response[responseSize - 7],
-													response[responseSize - 6],
-													response[responseSize - 5]);
-	printf("computed CRC: 0x%08x\n", crc);
-	if (crcCheck == 0) {
-		printf("CRC MATCH!\n");
-	} else {
-		printf("CRC MISMATCH!\n");
-	}
-#endif
+	*responseSize = receivedBytes;
 
 	// close the socket
 	close(sockfd);

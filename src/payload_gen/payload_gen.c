@@ -1,7 +1,8 @@
 #include "payload_gen.h"
 #include "aes.h"
 #include "crc32.h"
-#include "tools.h"
+
+#define IS_BIG_ENDIAN ('\x01\x02\x03\x04' == 0x01020304)
 
 #define TIMESTAMP_SIZE 10
 
@@ -25,7 +26,10 @@ uint8_t suffix[]      = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xaa, 0x55 };
 uint8_t prefix[]      = { 0x00, 0x00, 0x55, 0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 uint8_t commandCode[] = { 0x07, 0x00, 0x00, 0x00 };
 
-uint16_t GeneratePayload(device_t *device, command_t command, uint32_t time, uint8_t *resultPayload) {
+uint8_t prefixSize  = sizeof(prefix) / sizeof(prefix[0]);
+uint8_t commandCodeSize = sizeof(commandCode) / sizeof(commandCode[0]);
+
+uint16_t generatePayload(device_t *device, command_t command, uint32_t time, uint8_t *resultPayload) {
 
 	uint8_t devIdSize   = strlen((char*)devId);
 	uint8_t uuidSize    = strlen((char*)uuid);
@@ -34,8 +38,6 @@ uint16_t GeneratePayload(device_t *device, command_t command, uint32_t time, uin
 	uint8_t vMetaSize   = sizeof(vMeta) / sizeof(vMeta[0]);
 
 	uint8_t suffixSize  = sizeof(suffix) / sizeof(suffix[0]);
-	uint8_t prefixSize  = sizeof(prefix) / sizeof(prefix[0]);
-	uint8_t commandCodeSize = sizeof(commandCode) / sizeof(commandCode[0]);
 
 	////////////////////////
 	//VARIABLES DEFINITION//
@@ -346,6 +348,126 @@ uint16_t GeneratePayload(device_t *device, command_t command, uint32_t time, uin
 	free(payloadWithMeta);
 
 	return payloadWithMetaSize;
+}
+
+result_t checkPayload(uint8_t *response, uint8_t responseSize, command_t command) {
+	uint8_t *responsePtr, *tmpString, crcCheck = 0, i, endianessShift, actualPayloadSize, expectedPayloadSize;
+	uint32_t responseCrc;
+
+	////////////////
+	//PREFIX CHECK//
+	////////////////
+
+	responsePtr = response;
+	if (memcmp(responsePtr, prefix, prefixSize) != 0) {
+
+#ifdef DEBUG
+	printf("Error checking the response prefix\n");
+#endif
+
+		return RESPONSE_DATA_ERROR;
+	}
+
+	//////////////////////////
+	//PREFIX CHECK COMPLETED//
+	//////////////////////////
+
+	//////////////////////
+	//COMMAND CODE CHECK//
+	//////////////////////
+
+	responsePtr += prefixSize;
+	if (memcmp(responsePtr, commandCode, commandCodeSize) != 0) {
+
+#ifdef DEBUG
+	printf("Error checking the response command code\n");
+#endif
+
+		return RESPONSE_DATA_ERROR;
+	}
+
+	////////////////////////////////
+	//COMMAND CODE CHECK COMPLETED//
+	////////////////////////////////
+
+	/////////////////
+	//PAYLOAD CHECK//
+	/////////////////
+
+	responsePtr += commandCodeSize;
+	actualPayloadSize = response - responsePtr + responseSize - 1;
+	expectedPayloadSize = *responsePtr;
+	if (actualPayloadSize != expectedPayloadSize || actualPayloadSize < MIN_RESP_PAYLOAD_SIZE) {
+
+#ifdef DEBUG
+	printf("Error checking the response size\n");
+#endif
+
+		return RESPONSE_SIZE_ERROR;
+	}
+	tmpString = (uint8_t*)malloc(expectedPayloadSize - 8);
+	memset(tmpString, '\0', expectedPayloadSize - 8);
+	responsePtr++;
+	if (memcmp(responsePtr, tmpString, expectedPayloadSize - 8) != 0) {
+
+#ifdef DEBUG
+		printf("Error checking the response payload\n");
+#endif
+
+		return RESPONSE_DATA_ERROR;
+	}
+
+	///////////////////////////
+	//PAYLOAD CHECK COMPLETED//
+	///////////////////////////
+
+	///////////////
+	//CRC32 CHECK//
+	///////////////
+
+	responsePtr += expectedPayloadSize - 8;
+	responseCrc = crc32(response, responseSize - 8);
+	for (i = 0; i < sizeof(responseCrc); i++) {
+#if IS_BIG_ENDIAN == 1
+		endianessShift = 8 * ((uint8_t)sizeof(responseCrc) - i - 1);
+#else
+		endianessShift = 8 * i;
+#endif
+		crcCheck += *(responsePtr + i) != (uint8_t)(responseCrc >> endianessShift);
+	}
+
+#ifdef DEBUG
+	printf("received CRC: 0x%02x%02x%02x%02x\n", 	*(responsePtr), 
+													*(responsePtr + 1),
+													*(responsePtr + 2),
+													*(responsePtr + 3));
+	printf("computed CRC: 0x%08x\n", responseCrc);
+	printf(crcCheck == 0 ? "CRC MATCH!\n" : "CRC MISMATCH!\n");
+#endif
+
+	if (crcCheck != 0) {
+		return CRC_ERROR;
+	}
+
+	/////////////////////////
+	//CRC32 CHECK COMPLETED//
+	/////////////////////////
+
+	////////////////
+	//SUFFIX CHECK//
+	////////////////
+
+	responsePtr += 4;
+
+	if (memcmp(responsePtr, &(suffix[4]), 4) != 0) {
+		return RESPONSE_DATA_ERROR;
+	}
+
+	//////////////////////////
+	//SUFFIX CHECK COMPLETED//
+	//////////////////////////
+
+	return OK;
 }
 
 static void convertTimeToString(uint32_t inTime, uint8_t *result) {
